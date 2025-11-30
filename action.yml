@@ -1,0 +1,250 @@
+name: Build and Deploy to Steam Workshop
+
+on:
+  workflow_call:
+    inputs:
+      workshopId: 
+        required: true
+        default: '3526439840'
+        description: 'Steam Workshop ID of the mod to upload to'
+        type: string
+      ProjectFiles: 
+        required: true
+        default: 'Source/RimMod.csproj'
+        description: 'Comma-separated list of project files to build, e.g. "Source/Mod1.csproj, Source/Mod2.csproj"'
+        type: string
+
+jobs:
+  build:
+    name: Build
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore:') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: 'mod'
+
+      - name: Sanitize commit message
+        id: sanitize
+        run: |
+          COMMIT_MSG=$(printf '%s' "${{ github.event.head_commit.message }}")
+          SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g')
+          echo "SANITIZED_COMMIT_MSG=$SANITIZED" >> $GITHUB_ENV
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      
+      - name: Download Steam Workshop Dependencies
+        shell: bash
+        run: |
+          cd mod
+          cp  ${{ github.action_path }}/setup.sh .
+          chmod +x setup.sh
+
+          # Seriously? Line endings?
+          sed -i 's/\r$//' setup.sh
+
+          docker run --rm \
+            -v $(pwd):/workspace \
+            -w /workspace \
+            --entrypoint bash \
+            steamcmd/steamcmd:ubuntu-22 -c "./setup.sh"
+
+          rm setup.sh
+
+      - name: Build Mod
+        working-directory: mod
+        run: |
+          set -euo pipefail
+          FILES="${{ inputs.ProjectFiles }}"
+          IFS=',' read -ra FILE_ARR <<< "$FILES"
+          for FILE in "${FILE_ARR[@]}"; do
+            FILE="$(printf '%s' "$FILE" | xargs)"  # trim whitespace
+            if [ -n "$FILE" ]; then
+              echo "Building: $FILE"
+              dotnet build "$FILE" --configuration Release
+            fi
+          done
+
+      - name: Cleanup
+        working-directory: mod
+        run: |
+            rm -rf .git
+            rm -rf .vs
+            rm -rf .github/workflows
+            rm -rf .github
+            rm -rf .gitignore
+            rm -rf .gitattributes
+            rm -rf README.md
+            sudo rm -rf Workshop || true
+            find . -type d -name "obj" -exec rm -rf {} +
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-build
+          path: mod
+
+  steam_workshop:
+    name: Steam Workshop
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mod-build
+          path: mod
+
+      - name: Check required secrets
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        run: |
+          if [ -z "$STEAM_USERNAME" ]; then
+            echo "Error: STEAM_USERNAME secret is not set"
+            exit 1
+          fi
+          if [ -z "$STEAM_CONFIG_VDF" ]; then
+            echo "Error: STEAM_CONFIG_VDF secret is not set"
+            exit 1
+          fi
+          echo "All required secrets are present"
+
+      - name: Sanitize commit message
+        id: sanitize2
+        run: |
+          COMMIT_MSG=$(printf '%s' "${{ github.event.head_commit.message }}")
+          SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g')
+          echo "SANITIZED_COMMIT_MSG=$SANITIZED" >> $GITHUB_ENV
+
+      - name: Upload to Steam Workshop
+        uses: m00nl1ght-dev/steam-workshop-deploy@v4
+        continue-on-error: true
+        with: 
+          appId: 294100 # Game's Steam App ID
+          publishedFileId: ${{ inputs.workshopId }} # Your mod's Steam Workshop ID
+          path: 'mod' # Path to your mod's folder from repository root
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf:  ${{ secrets.STEAM_CONFIG_VDF }}
+          changeNote: "${{ env.SANITIZED_COMMIT_MSG }}"
+
+      - name: Verify Upload
+        if: ${{ inputs.workshopId != '3526439840' }}
+        run: |
+          time=$(curl -X POST "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/"   -H "Content-Type: application/x-www-form-urlencoded"   -d "itemcount=1"   -d "publishedfileids[0]=${{ env.workshopId }}" 2>/dev/null | jq -r '.response.publishedfiledetails[].time_updated')
+          now=$(date +%s)
+          if ! printf '%s' "$time" | grep -Eq '^[0-9]+$'; then
+            echo "Unable to parse time: $time"
+          else
+            delta=$(( now - time ))
+            if [ "$delta" -lt 0 ]; then
+              delta=$(( -delta ))
+              suffix="from now"
+            else
+              suffix="ago"
+            fi
+
+            days=$(( delta / 86400 ))
+            hours=$(( (delta % 86400) / 3600 ))
+            minutes=$(( (delta % 3600) / 60 ))
+            seconds=$(( delta % 60 ))
+
+            human_parts=()
+            [ "$days" -gt 0 ] && human_parts+=("${days}d")
+            [ "$hours" -gt 0 ] && human_parts+=("${hours}h")
+            [ "$minutes" -gt 0 ] && human_parts+=("${minutes}m")
+            if [ "${#human_parts[@]}" -eq 0 ]; then
+              human_parts+=("${seconds}s")
+            fi
+
+            human="$(printf '%s ' "${human_parts[@]}" | sed 's/ $//')"
+            GREEN=$'\033[0;32m'
+            RED=$'\033[0;31m'
+            NC=$'\033[0m'
+            exit=-1
+            if [ "$time" -ge $(( now - 3600 )) ]; then
+              status_icon="${GREEN}✓${NC}"
+              exit=0
+            else
+              status_icon="${RED}✗${NC}"
+              exit=1
+            fi
+            human="$status_icon $human"         
+            echo "$human $suffix"
+            exit $exit
+          fi
+
+
+          # Fallback simple check
+          if [ "$time" -ge $(($now-3600)) ]; then
+            echo "Upload verified successfully."
+            exit 0
+          else
+            echo "Upload verification failed."
+            exit 1
+          fi
+
+          # Failed to check
+          echo "Checks failed."
+          exit 1
+
+  releases_page:
+    name: Releases page
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mod-build
+          path: release_artifact
+
+      - name: Prepare release metadata
+        id: release_meta
+        run: |
+          TAG="v$(date +%Y%m%d%H%M%S)"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          TITLE="$(date +%Y-%m-%d)"
+          echo "RELEASE_TITLE=$TITLE" >> $GITHUB_ENV
+
+      - name: Package artifact
+        run: |
+          # Create a compressed archive of the mod folder for upload
+          cd release_artifact
+          if [ -d mod ]; then
+            tar -czf ../mod-build.tar.gz mod
+          else
+            # fallback: compress whatever is present
+            tar -czf ../mod-build.tar.gz .
+          fi
+        working-directory: release_artifact
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.TAG }}
+          release_name: ${{ env.RELEASE_TITLE }}
+          body: "Automated release from workflow run ${{ github.run_number }}"
+          draft: false
+          prerelease: false
+
+      - name: Upload asset to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./mod-build.tar.gz
+          asset_name: mod-build.tar.gz
+          asset_content_type: application/gzip
+
