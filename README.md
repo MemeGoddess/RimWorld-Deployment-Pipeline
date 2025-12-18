@@ -19,12 +19,41 @@ on:
       - master
 
 jobs:
-    rimworld-deploy:
-        uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/workflows/deploy.yml@main
-        secrets: inherit
-        with:
-            # This is a private workshop ID that I use as staging
-            # I highly recommend you have one as well
-            workshopId: '3526439840' # Only update after you've deployed to staging and confirmed it works
-            ProjectFiles: 'Source/RimMod.csproj' # ex: 'Source/RimMod.csproj, ModCompat/X/X.csproj'
+  rimworld-deploy:
+      uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/workflows/deploy.yml@main
+      secrets: inherit
+      with:
+          # This is a private workshop ID that I use as staging
+          # I highly recommend you have one as well
+          # Only update after you've deployed to staging and confirmed it works
+          workshopId: '3526439840' 
+          
+          # ex: 'Source/RimMod.csproj, ModCompat/X/X.csproj'
+          # optional, will skip building if not provided
+          ProjectFiles: 'Source/RimMod.csproj' 
+```
+
+## Build on PR close
+Want to keep the debug version of your mod up to date in your main branch? This workflow will build all your changes, and do a `chore` commit to your main branch with all the mod assemblies. This won't trigger a deployment.
+
+```yaml
+name: Build and Commit to Main on PR Close
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+        - main
+        - master
+        paths:
+          - 'Source/**' # Include any other folders as well
+
+permissions:
+  contents: write
+
+jobs:
+  pr-closed-build:
+    uses: MemeGodess/RimWorld-Deployment-Pipeline/.github/workflows/pr-closed.yml@main
+    with:
+      ProjectFiles: 'Source/RimMod.csproj'
 ```
