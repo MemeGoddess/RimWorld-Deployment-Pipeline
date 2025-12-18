@@ -19,6 +19,14 @@ on:
         default: 'mod'
         description: 'Path to checked out mod folder. Defaults to "mod". Only need to change if using this action from within another action.'
         type: string
+      SteamUsername:
+        required: true
+        description: 'Steam username to use for uploading.'
+        type: string
+      SteamConfigVDF:
+        required: true
+        description: 'SteamCMD config.vdf to use for uploading.'
+        type: string
 
 jobs:
   deploy:
@@ -28,8 +36,8 @@ jobs:
     steps:
     - name: Check required secrets
       env:
-        STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
-        STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        STEAM_USERNAME: ${{ inputs.SteamUsername }}
+        STEAM_CONFIG_VDF: ${{ inputs.SteamConfigVDF }}
       run: |
         if [ -z "$STEAM_USERNAME" ]; then
           echo "Error: STEAM_USERNAME secret is not set"
@@ -47,6 +55,10 @@ jobs:
         COMMIT_MSG=$(printf '%s' "${{ github.event.head_commit.message }}")
         SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g')
         echo "SANITIZED_COMMIT_MSG=$SANITIZED" >> $GITHUB_ENV
+        # expose sanitized message as a step output for use in workflow expressions
+        printf '%s\n' "message<<EOF" >> $GITHUB_OUTPUT
+        printf '%s\n' "$SANITIZED" >> $GITHUB_OUTPUT
+        printf '%s\n' "EOF" >> $GITHUB_OUTPUT
 
     - name: Set up .NET SDK
       uses: actions/setup-dotnet@v4
@@ -105,9 +117,9 @@ jobs:
         appId: 294100 # Game's Steam App ID
         publishedFileId: ${{ inputs.workshopId }} # Your mod's Steam Workshop ID
         path: ${{ inputs.Path }} # Path to your mod's folder from repository root
-        username: ${{ secrets.STEAM_USERNAME }}
-        configVdf:  ${{ secrets.STEAM_CONFIG_VDF }}
-        changeNote: "${{ env.SANITIZED_COMMIT_MSG }}"
+        username: ${{ inputs.SteamUsername }}
+        configVdf:  ${{ inputs.SteamConfigVDF }}
+        changeNote: "${{ steps.sanitize.outputs.message }}"
 
     - name: Verify Upload
       if: ${{ inputs.workshopId != '3526439840' }}
