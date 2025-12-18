@@ -19,14 +19,13 @@ on:
         default: 'mod'
         description: 'Path to checked out mod folder. Defaults to "mod". Only need to change if using this action from within another action.'
         type: string
-      SteamUsername:
+    secrets:
+      STEAM_USERNAME:
         required: true
         description: 'Steam username to use for uploading.'
-        type: string
-      SteamConfigVDF:
+      STEAM_CONFIG_VDF:
         required: true
         description: 'SteamCMD config.vdf to use for uploading.'
-        type: string
 
 jobs:
   deploy:
@@ -36,8 +35,8 @@ jobs:
     steps:
     - name: Check required secrets
       env:
-        STEAM_USERNAME: ${{ inputs.SteamUsername }}
-        STEAM_CONFIG_VDF: ${{ inputs.SteamConfigVDF }}
+        STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+        STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
       run: |
         if [ -z "$STEAM_USERNAME" ]; then
           echo "Error: STEAM_USERNAME secret is not set"
@@ -117,8 +116,8 @@ jobs:
         appId: 294100 # Game's Steam App ID
         publishedFileId: ${{ inputs.workshopId }} # Your mod's Steam Workshop ID
         path: ${{ inputs.Path }} # Path to your mod's folder from repository root
-        username: ${{ inputs.SteamUsername }}
-        configVdf:  ${{ inputs.SteamConfigVDF }}
+        username: ${{ secrets.STEAM_USERNAME }}
+        configVdf:  ${{ secrets.STEAM_CONFIG_VDF }}
         changeNote: "${{ steps.sanitize.outputs.message }}"
 
     - name: Verify Upload
