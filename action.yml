@@ -1,4 +1,5 @@
 name: Build and Deploy to Steam Workshop
+description: Builds a RimWorld mod, and uploads it to the Steam Workshop
 
 on:
   workflow_call:
