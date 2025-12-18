@@ -14,11 +14,6 @@ on:
         default: ''
         description: 'Comma-separated list of project files to build, e.g. "Source/Mod1.csproj, Source/Mod2.csproj"'
         type: string
-      Path:
-        required: false
-        default: 'mod'
-        description: 'Path to checked out mod folder. Defaults to "mod". Only need to change if using this action from within another action.'
-        type: string
     secrets:
       STEAM_USERNAME:
         required: true
@@ -33,6 +28,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        path: 'mod'
+
     - name: Check required secrets
       env:
         STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
@@ -66,7 +66,7 @@ jobs:
 
     - name: Download Steam Workshop Dependencies
       shell: bash
-      working-directory: ${{ inputs.Path }}
+      working-directory: 'mod'
       run: |
         cp  ${{ github.action_path }}/setup.sh .
         chmod +x setup.sh
@@ -83,7 +83,7 @@ jobs:
         rm setup.sh
 
     - name: Build Mod
-      working-directory: ${{ inputs.Path }}
+      working-directory: 'mod'
       run: |
         set -euo pipefail
         FILES="${{ inputs.ProjectFiles }}"
@@ -97,7 +97,7 @@ jobs:
         done
 
     - name: Cleanup
-      working-directory: ${{ inputs.Path }}
+      working-directory: 'mod'
       run: |
           rm -rf .git
           rm -rf .vs
@@ -115,7 +115,7 @@ jobs:
       with: 
         appId: 294100 # Game's Steam App ID
         publishedFileId: ${{ inputs.workshopId }} # Your mod's Steam Workshop ID
-        path: ${{ inputs.Path }} # Path to your mod's folder from repository root
+        path: 'mod' # Path to your mod's folder from repository root
         username: ${{ secrets.STEAM_USERNAME }}
         configVdf:  ${{ secrets.STEAM_CONFIG_VDF }}
         changeNote: "${{ steps.sanitize.outputs.message }}"
