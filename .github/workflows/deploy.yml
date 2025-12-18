@@ -60,16 +60,19 @@ jobs:
         printf '%s\n' "EOF" >> $GITHUB_OUTPUT
 
     - name: Set up .NET SDK
+      if: ${{ inputs.ProjectFiles != '' }}
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
     - name: Download Steam Workshop Dependencies
+      if: ${{ inputs.ProjectFiles != '' }}
       uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/actions/download-steam-workshop@main
       with: 
         path: 'mod'
 
     - name: Build Mod
+      if: ${{ inputs.ProjectFiles != '' }}
       working-directory: 'mod'
       run: |
         set -euo pipefail
@@ -98,7 +101,7 @@ jobs:
 
     - name: Upload to Steam Workshop
       uses: m00nl1ght-dev/steam-workshop-deploy@v4
-      continue-on-error: true
+      continue-on-error: false
       with: 
         appId: 294100 # Game's Steam App ID
         publishedFileId: ${{ inputs.workshopId }} # Your mod's Steam Workshop ID
