@@ -65,7 +65,7 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Download Steam Workshop Dependencies
-      uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/actions/download-steam-workshop
+      uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/actions/download-steam-workshop@main
       with: 
         path: 'mod'
 
