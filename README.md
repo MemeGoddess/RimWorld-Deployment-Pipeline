@@ -26,5 +26,5 @@ jobs:
             # This is a private workshop ID that I use as staging
             # I highly recommend you have one as well
             workshopId: '3526439840' # Only update after you've deployed to staging and confirmed it works
-            ProjectFiles: 'Source/RimMod.csproj'
+            ProjectFiles: 'Source/RimMod.csproj' # ex: 'Source/RimMod.csproj, ModCompat/X/X.csproj'
 ```
