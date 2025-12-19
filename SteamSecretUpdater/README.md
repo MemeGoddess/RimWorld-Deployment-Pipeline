@@ -18,6 +18,12 @@ Once you've done that, it's as simple as running it with docker compose.
 docker compose up --build --detach
 ```
 
+Or if you would like to update the tool
+```bash
+git pull
+docker compose down && docker compose up --build --detach
+```
+
 ## Add Secret to new Repo
 Setting up a new repo for the pipeline is really easy with this tool as well. You can simply run this command, and it'll set up the secrets. This would add the `STEAM_USERNAME` and `STEAM_CONFIG_VDF` secrets to the `MemeGoddess/RimWorld-ReplaceStuff` repository
 
