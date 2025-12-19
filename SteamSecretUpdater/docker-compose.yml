@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  steam-secret-updater:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - STEAM_USERNAME=
+      - GH_USERNAME=
+    volumes:
+      - ${HOME}/Steam/config/config.vdf:/home/steam/Steam/config/config.vdf:rw
+      - ${HOME}/.config/gh/:/home/steam/.config/gh/:rw
+    container_name: steam-secret-updater
+    restart: unless-stopped
