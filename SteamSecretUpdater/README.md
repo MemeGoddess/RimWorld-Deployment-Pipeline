@@ -15,7 +15,7 @@ Clone or download this folder, then update the STEAM_USERNAME and GH_USERNAME. M
 
 Once you've done that, it's as simple as running it with docker compose.
 ```bash
-docker compose up
+docker compose up --build --detach
 ```
 
 ## Add Secret to new Repo
