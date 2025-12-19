@@ -96,6 +96,16 @@ function verifySteam()
 
 function verifyEnv()
 {
+    if [ -z "$STEAM_USERNAME" ]; then
+        echo "STEAM_USERNAME environment variable is not set."
+        exit 1
+    fi
+
+    if [ -z "$GH_USERNAME" ]; then
+        echo "GH_USERNAME environment variable is not set."
+        exit 1
+    fi
+
     if ! command -v gh &> /dev/null; then
         echo "gh CLI could not be found, please install it from https://cli.github.com/"
         exit 1
@@ -112,16 +122,6 @@ function verifyEnv()
 
     if ! command -v jq &> /dev/null; then
         echo "jq could not be found, please install it from https://jqlang.org/download/"
-        exit 1
-    fi
-
-    if [ -z "$STEAM_USERNAME" ]; then
-        echo "STEAM_USERNAME environment variable is not set."
-        exit 1
-    fi
-
-    if [ -z "$GH_USERNAME" ]; then
-        echo "GH_USERNAME environment variable is not set."
         exit 1
     fi
 }
