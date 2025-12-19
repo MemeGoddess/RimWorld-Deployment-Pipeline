@@ -24,6 +24,8 @@ It's a good idea to check where SteamCMD is keeping your config, as it's differe
 
 `Logging directory: '/some/path/to/steamcmd/Steam/logs`
 
+This means the path would be `/some/path/to/steamcmd/Steam/config/config.vdf`
+
 ### Github
 Next we have to authenticate with Github, you can log in via your browser, so this is very easy.
 ```bash
