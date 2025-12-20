@@ -82,14 +82,19 @@ jobs:
             val=false
           fi
           # expose as step outputs and env vars
+          # check whether a branch like "version/1.1" exists (local or remote)
+          BR_NAME="version/${ver}"
+          BR_EXISTS=false
+          if git -C mod rev-parse --verify --quiet "refs/heads/$BR_NAME" >/dev/null 2>&1 || git -C mod ls-remote --exit-code --heads origin "$BR_NAME" >/dev/null 2>&1; then
+            BR_EXISTS=true
+          fi
+
+          # if the branch does not exist, do not consider this supported version
+          if [ "$BR_EXISTS" = true ] && [ "$val" = true ]; then
           echo "${key}=$val" >> $GITHUB_OUTPUT
           echo "TARGET_${key}=$val" >> $GITHUB_ENV
+          fi
         done
-
-        # keep a compatible comma-separated list of supported versions (v1.1,v1.2,...)
-        SUPPORTED_COMMA=$(IFS=,; echo "${VERSIONS_LIST[*]}")
-        echo "versions=$SUPPORTED_COMMA" >> $GITHUB_OUTPUT
-        echo "TARGET_VERSIONS=$SUPPORTED_COMMA" >> $GITHUB_ENV
 
     - name: Set up .NET SDK
       if: ${{ inputs.ProjectFiles != '' }}
