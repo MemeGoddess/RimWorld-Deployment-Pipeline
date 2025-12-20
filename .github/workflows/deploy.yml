@@ -70,16 +70,26 @@ jobs:
           exit 0
         fi
 
-        # extract <li> contents inside <supportedVersions>...</supportedVersions>
-        VERSIONS=$(sed -n '/<supportedVersions>/,/<\/supportedVersions>/p' "$FILE" \
-          | tr -d '\r' \
-          | sed -n 's/.*<li[^>]*>\(.*\)<\/li>.*/\1/p' \
-          | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
-          | paste -sd, -)
+        # check supported versions v1.1..v1.6 and export booleans per-version
+        SUPPORTED_BLOCK=$(sed -n '/<supportedVersions>/,/<\/supportedVersions>/p' "$FILE" | tr -d '\r' | tr '\n' ' ')
+        VERSIONS_LIST=()
+        for ver in 1.1 1.2 1.3 1.4 1.5 1.6; do
+          key="v${ver//./_}"                    # e.g. v1_1
+          if printf '%s' "$SUPPORTED_BLOCK" | grep -E -qi "<li[^>]*>[[:space:]]*(v?${ver})[[:space:]]*</li>"; then
+            val=true
+            VERSIONS_LIST+=("v${ver}")
+          else
+            val=false
+          fi
+          # expose as step outputs and env vars
+          echo "${key}=$val" >> $GITHUB_OUTPUT
+          echo "TARGET_${key}=$val" >> $GITHUB_ENV
+        done
 
-        # export for later steps
-        echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
-        echo "TARGET_VERSIONS=$VERSIONS" >> $GITHUB_ENV
+        # keep a compatible comma-separated list of supported versions (v1.1,v1.2,...)
+        SUPPORTED_COMMA=$(IFS=,; echo "${VERSIONS_LIST[*]}")
+        echo "versions=$SUPPORTED_COMMA" >> $GITHUB_OUTPUT
+        echo "TARGET_VERSIONS=$SUPPORTED_COMMA" >> $GITHUB_ENV
 
     - name: Set up .NET SDK
       if: ${{ inputs.ProjectFiles != '' }}
