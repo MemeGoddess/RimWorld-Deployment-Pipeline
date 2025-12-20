@@ -59,6 +59,28 @@ jobs:
         printf '%s\n' "$SANITIZED" >> $GITHUB_OUTPUT
         printf '%s\n' "EOF" >> $GITHUB_OUTPUT
 
+    - name: Parse target versions
+      id: parse_versions
+      run: |
+        set -euo pipefail
+        FILE='mod/About/About.xml'
+        if [ ! -f "$FILE" ]; then
+          echo "versions=" >> $GITHUB_OUTPUT
+          echo "TARGET_VERSIONS=" >> $GITHUB_ENV
+          exit 0
+        fi
+
+        # extract <li> contents inside <supportedVersions>...</supportedVersions>
+        VERSIONS=$(sed -n '/<supportedVersions>/,/<\/supportedVersions>/p' "$FILE" \
+          | tr -d '\r' \
+          | sed -n 's/.*<li[^>]*>\(.*\)<\/li>.*/\1/p' \
+          | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+          | paste -sd, -)
+
+        # export for later steps
+        echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
+        echo "TARGET_VERSIONS=$VERSIONS" >> $GITHUB_ENV
+
     - name: Set up .NET SDK
       if: ${{ inputs.ProjectFiles != '' }}
       uses: actions/setup-dotnet@v4
