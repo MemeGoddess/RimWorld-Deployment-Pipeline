@@ -20,7 +20,7 @@ on:
 
 jobs:
   rimworld-deploy:
-      uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/workflows/deploy.yml@main
+      uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/workflows/deploy.yml@beta
       secrets: inherit
       with:
           # This is a private workshop ID that I use as staging
@@ -53,7 +53,7 @@ permissions:
 
 jobs:
   pr-closed-build:
-    uses: MemeGodess/RimWorld-Deployment-Pipeline/.github/workflows/pr-closed.yml@main
+    uses: MemeGodess/RimWorld-Deployment-Pipeline/.github/workflows/pr-closed.yml@beta
     with:
       ProjectFiles: 'Source/RimMod.csproj'
 ```
