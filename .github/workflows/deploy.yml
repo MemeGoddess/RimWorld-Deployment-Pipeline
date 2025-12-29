@@ -104,7 +104,7 @@ jobs:
 
     - name: Download Steam Workshop Dependencies
       if: ${{ inputs.ProjectFiles != '' }}
-      uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/actions/download-steam-workshop@main
+      uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/actions/download-steam-workshop@latest
       with: 
         path: 'mod'
 
