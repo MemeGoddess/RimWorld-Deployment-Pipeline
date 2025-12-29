@@ -53,7 +53,7 @@ permissions:
 
 jobs:
   pr-closed-build:
-    uses: MemeGodess/RimWorld-Deployment-Pipeline/.github/workflows/pr-closed.yml@beta
+    uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/workflows/pr-closed.yml@beta
     with:
       ProjectFiles: 'Source/RimMod.csproj'
 ```
