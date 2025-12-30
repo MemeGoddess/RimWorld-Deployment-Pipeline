@@ -37,7 +37,7 @@ jobs:
             working-directory: mod
             run: |
                 set -euo pipefail
-                FILES="${{ env.ProjectFiles }}"
+                FILES="${{ inputs.ProjectFiles }}"
                 IFS=',' read -ra FILE_ARR <<< "$FILES"
                 for FILE in "${FILE_ARR[@]}"; do
                     FILE="$(printf '%s' "$FILE" | xargs)"  # trim whitespace
