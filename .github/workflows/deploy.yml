@@ -6,7 +6,6 @@ on:
     inputs:
       workshopId: 
         required: true
-        default: '3526439840'
         description: 'Steam Workshop ID of the mod to upload to'
         type: string
       ExcludedProjectFiles: 
@@ -14,6 +13,11 @@ on:
         default: ''
         description: 'Comma-separated list of project files to exclude from build, e.g. "Source/Mod1.csproj, Source/Mod2.csproj"'
         type: string
+      DisableNameCheck:
+        required: false
+        default: false
+        description: 'Set to true to disable the check that verifies the workshop item name matches the mod name in About.xml'
+        type: boolean
     secrets:
       STEAM_USERNAME:
         required: true
@@ -47,7 +51,131 @@ jobs:
           exit 1
         fi
         echo "All required secrets are present"
+    
+    - name: Check Workshop Item Visibility
+      id: check_visibility
+      run: |
+        RESPONSE=$(curl -X POST "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/" \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          -d "itemcount=1" \
+          -d "publishedfileids[0]=${{ inputs.workshopId }}" 2>/dev/null)
+        
+        RESULT=$(echo "$RESPONSE" | jq -r '.response.publishedfiledetails[0].result')
+        
+        WORKSHOP_TITLE=$(echo "$RESPONSE" | jq -r '.response.publishedfiledetails[0].title')
+        echo "WORKSHOP_TITLE=$WORKSHOP_TITLE" >> $GITHUB_OUTPUT
+        if [ "$RESULT" = "9" ]; then
+          echo "PRIVATE=true" >> $GITHUB_OUTPUT
+          echo "Workshop item is private"
+        else
+          echo "PRIVATE=false" >> $GITHUB_OUTPUT
+          echo "Workshop item is not private, enabling extra checks"
+        fi
+    
+    - name: Validate About.xml
+      working-directory: 'mod'
+      run: |
+        if [ ! -f "About/About.xml" ]; then
+          echo "Error: About/About.xml file not found in mod directory"
+          exit 1
+        fi
+        echo "About/About.xml file found"
+        
+        # Validate required ModMetaData fields
+        ABOUT_CONTENT=$(cat "About/About.xml")
+        
+        # Check for name
+        if ! echo "$ABOUT_CONTENT" | grep -q "<name>.*</name>"; then
+          echo "Error: About.xml is missing required <name> element"
+          exit 1
+        fi
+        echo "✓ name element found"
 
+        # Check if workshop item is public and title matches About.xml name
+        if [ "${{ steps.check_visibility.outputs.PRIVATE }}" = "false" ] && [ "${{ inputs.DisableNameCheck }}" = "false" ]; then
+          WORKSHOP_TITLE="${{ steps.check_visibility.outputs.WORKSHOP_TITLE }}"
+          MOD_NAME=$(echo "$ABOUT_CONTENT" | sed -n 's/.*<name>\([^<]*\)<\/name>.*/\1/p' | head -1 | xargs)
+
+          ORIGINAL_WORKSHOP_TITLE=$WORKSHOP_TITLE
+          ORIGINAL_MOD_NAME=$MOD_NAME
+        
+          # Normalize both strings for comparison (lowercase, remove special chars and spaces)
+          WORKSHOP_TITLE=$(echo "$WORKSHOP_TITLE" | tr '[:upper:]' '[:lower:]')
+          MOD_NAME=$(echo "$MOD_NAME" | tr '[:upper:]' '[:lower:]')
+
+          JUNK_WORDS='(-|continue|continued|reborn|re-uploaded|reupload|temp|update|and|the|for|with|mod|rimworld|rim|patch|edition|fork|lite|redux|v[0-9]+)'
+
+          WORKSHOP_TITLE=$(echo "$WORKSHOP_TITLE" | sed -E "s/$JUNK_WORDS//g")
+          MOD_NAME=$(echo "$MOD_NAME" | sed -E "s/$JUNK_WORDS//g")
+          # Trim double spaces and leading/trailing spaces
+          WORKSHOP_TITLE=$(echo "$WORKSHOP_TITLE" | sed 's/  */ /g' | sed 's/^ *//;s/ *$//')
+          MOD_NAME=$(echo "$MOD_NAME" | sed 's/  */ /g' | sed 's/^ *//;s/ *$//')
+          echo $WORKSHOP_TITLE
+          echo $MOD_NAME
+
+          NORMALIZED_WORKSHOP=$(echo "$WORKSHOP_TITLE" | sed 's/[^a-z0-9]//g')
+          NORMALIZED_MOD=$(echo "$MOD_NAME" | sed 's/[^a-z0-9]//g')
+          
+          # Check if one contains the other or they share significant overlap
+          if [ -z "$NORMALIZED_WORKSHOP" ] || [ -z "$NORMALIZED_MOD" ]; then
+            echo "Warning: Could not compare workshop title with mod name"
+            exit 1
+          elif [[ "$NORMALIZED_WORKSHOP" == *"$NORMALIZED_MOD"* ]] || [[ "$NORMALIZED_MOD" == *"$NORMALIZED_WORKSHOP"* ]]; then
+            echo "✓ Workshop title '$ORIGINAL_WORKSHOP_TITLE' matches mod name '$ORIGINAL_MOD_NAME'"
+          else
+            # Fuzzy match: check if at least 50% of words from one appear in the other
+            WORKSHOP_WORDS=$(echo "$WORKSHOP_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '\n' | sort -u | grep -v '^$')
+            MOD_WORDS=$(echo "$MOD_NAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '\n' | sort -u | grep -v '^$')
+            MATCH_COUNT=0
+            TOTAL_WORDS=$(echo "$MOD_WORDS" | wc -l)
+            for word in $MOD_WORDS; do
+              if [ ${#word} -ge 3 ] && echo "$WORKSHOP_WORDS" | grep -qF "$word"; then
+                MATCH_COUNT=$((MATCH_COUNT + 1))
+              fi
+            done
+            if [ "$TOTAL_WORDS" -gt 0 ] && [ $((MATCH_COUNT * 2)) -ge "$TOTAL_WORDS" ]; then
+              echo "✓ Workshop title '$ORIGINAL_WORKSHOP_TITLE' appears similar to mod name '$ORIGINAL_MOD_NAME' (fuzzy match)"
+            else
+              echo "Warning: Workshop title '$ORIGINAL_WORKSHOP_TITLE' does not appear to match About.xml name '$ORIGINAL_MOD_NAME'"
+              echo "Please verify you are uploading to the correct workshop item"
+              echo "If this is correct, you can disable this check in the deployment pipeline settings"
+              exit 1
+            fi
+          fi
+        fi
+        
+        # Check for author
+        if ! echo "$ABOUT_CONTENT" | grep -q "<author>.*</author>"; then
+          echo "Error: About.xml is missing required <author> element"
+          exit 1
+        fi
+        echo "✓ author element found"
+        
+        # Check for packageId
+        if ! echo "$ABOUT_CONTENT" | grep -q "<packageId>.*</packageId>"; then
+          echo "Error: About.xml is missing required <packageId> element"
+          exit 1
+        fi
+        echo "✓ packageId element found"
+        
+        # Check for supportedVersions with at least one version
+        if ! echo "$ABOUT_CONTENT" | grep -q "<supportedVersions>"; then
+          echo "Error: About.xml is missing required <supportedVersions> element"
+          exit 1
+        fi
+        if ! echo "$ABOUT_CONTENT" | grep -q "<supportedVersions>.*<li>.*</li>.*</supportedVersions>"; then
+          # Multi-line check
+          SUPPORTED_BLOCK=$(sed -n '/<supportedVersions>/,/<\/supportedVersions>/p' "About/About.xml")
+          if ! echo "$SUPPORTED_BLOCK" | grep -q "<li>"; then
+            echo "Error: About.xml <supportedVersions> must contain at least one <li> element"
+            exit 1
+          fi
+        fi
+        echo "✓ supportedVersions element found with at least one version"
+        
+        echo "All required ModMetaData fields validated successfully"
+    
+      
     - name: Sanitize commit message
       id: sanitize
       env:
@@ -169,7 +297,7 @@ jobs:
         changeNote: "${{ steps.sanitize.outputs.message }}"
 
     - name: Verify Upload
-      if: ${{ inputs.workshopId != '3526439840' }}
+      if: ${{ steps.check_visibility.outputs.PRIVATE == 'false' }}
       run: |
         time=$(curl -X POST "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/"   -H "Content-Type: application/x-www-form-urlencoded"   -d "itemcount=1"   -d "publishedfileids[0]=${{ inputs.workshopId }}" 2>/dev/null | jq -r '.response.publishedfiledetails[].time_updated')
         now=$(date +%s)
