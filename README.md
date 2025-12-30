@@ -29,8 +29,8 @@ jobs:
           workshopId: '3526439840' 
           
           # ex: 'Source/RimMod.csproj, ModCompat/X/X.csproj'
-          # optional, will skip building if not provided
-          ProjectFiles: 'Source/RimMod.csproj' 
+          # optional, will skip building these projects
+          ExcludeProjectFiles: 'Source/RimMod.csproj'
 ```
 
 ## Build on PR close
@@ -55,5 +55,5 @@ jobs:
   pr-closed-build:
     uses: MemeGodess/RimWorld-Deployment-Pipeline/.github/workflows/pr-closed.yml@latest
     with:
-      ProjectFiles: 'Source/RimMod.csproj'
+      ExcludeProjectFiles: 'Source/RimMod.csproj' # Optional
 ```
