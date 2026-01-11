@@ -294,7 +294,7 @@ jobs:
         path: 'mod' # Path to your mod's folder from repository root
         username: ${{ secrets.STEAM_USERNAME }}
         configVdf:  ${{ secrets.STEAM_CONFIG_VDF }}
-        changeNote: "${{ steps.sanitize.outputs.message }}"
+        changeNote: "${{ steps.sanitize.outputs.SANITIZED_COMMIT_MSG }}"
 
     - name: Verify Upload
       if: ${{ steps.check_visibility.outputs.PRIVATE == 'false' }}
