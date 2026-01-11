@@ -182,6 +182,8 @@ jobs:
         COMMIT_MSG: ${{ github.event.head_commit.message }}
       run: |
         SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g' | sed 's/ - / • /g')
+        # Convert PR references like (#123) to Steam-formatted links
+        SANITIZED=$(echo "$SANITIZED" | sed -E "s/\(#([0-9]+)\)/[url=https:\/\/github.com\/$GITHUB_REPOSITORY\/pull\/\1](#\1)[\/url]/g")
         {
           echo 'SANITIZED_COMMIT_MSG<<EOF'
           echo "$SANITIZED"
