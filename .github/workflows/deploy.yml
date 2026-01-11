@@ -181,7 +181,7 @@ jobs:
       env:
         COMMIT_MSG: ${{ github.event.head_commit.message }}
       run: |
-        SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g' | tr '\n' ' ')
+        SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g')
         echo "SANITIZED_COMMIT_MSG=$SANITIZED" >> $GITHUB_ENV
         # expose sanitized message as a step output for use in workflow expressions
         printf '%s\n' "message<<EOF" >> $GITHUB_OUTPUT
