@@ -187,7 +187,6 @@ jobs:
           echo "$SANITIZED"
           echo 'EOF'
         } >> $GITHUB_OUTPUT
-        printf '%s\n' "EOF" >> $GITHUB_OUTPUT
 
     - name: Parse target versions
       id: parse_versions
