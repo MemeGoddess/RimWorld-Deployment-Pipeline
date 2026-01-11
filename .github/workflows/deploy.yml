@@ -50,14 +50,17 @@ jobs:
 
     - name: Sanitize commit message
       id: sanitize
+      env:
+        COMMIT_MSG: ${{ github.event.head_commit.message }}
       run: |
-        COMMIT_MSG=$(printf '%s' "${{ github.event.head_commit.message }}")
-        SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g')
-        echo "SANITIZED_COMMIT_MSG=$SANITIZED" >> $GITHUB_ENV
-        # expose sanitized message as a step output for use in workflow expressions
-        printf '%s\n' "message<<EOF" >> $GITHUB_OUTPUT
-        printf '%s\n' "$SANITIZED" >> $GITHUB_OUTPUT
-        printf '%s\n' "EOF" >> $GITHUB_OUTPUT
+        SANITIZED=$(printf '%s' "$COMMIT_MSG" | sed 's/\"/'"'"'/g' | sed 's/^ *- / • /g' | sed 's/\n *- /\n • /g')
+        # Convert PR references like (#123) to Steam-formatted links
+        SANITIZED=$(echo "$SANITIZED" | sed -E "s|\(#([0-9]+)\)|[url=https://github.com/$GITHUB_REPOSITORY/pull/\1](#\1)[/url]|g")
+        {
+          echo 'SANITIZED_COMMIT_MSG<<EOF'
+          echo "$SANITIZED"
+          echo 'EOF'
+        } >> $GITHUB_OUTPUT
 
     - name: Set up .NET SDK
       if: ${{ inputs.ProjectFiles != '' }}
@@ -108,7 +111,7 @@ jobs:
         path: 'mod' # Path to your mod's folder from repository root
         username: ${{ secrets.STEAM_USERNAME }}
         configVdf:  ${{ secrets.STEAM_CONFIG_VDF }}
-        changeNote: "${{ steps.sanitize.outputs.message }}"
+        changeNote: "${{ steps.sanitize.outputs.SANITIZED_COMMIT_MSG }}"
 
     - name: Verify Upload
       if: ${{ inputs.workshopId != '3526439840' }}
