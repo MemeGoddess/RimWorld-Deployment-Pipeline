@@ -36,6 +36,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         path: 'mod'
+        submodules: 'recursive'
 
     - name: Check required secrets
       env:
@@ -277,6 +278,7 @@ jobs:
     - name: Cleanup
       working-directory: 'mod'
       run: |
+          git submodule foreach --recursive 'rm -rf $toplevel/$sm_path'
           rm -rf .git
           rm -rf .vs
           rm -rf .github/workflows
