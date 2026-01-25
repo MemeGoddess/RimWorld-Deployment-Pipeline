@@ -278,8 +278,10 @@ jobs:
     - name: Cleanup
       working-directory: 'mod'
       run: |
-          ls -la
-          git submodule foreach --recursive 'rm -rf $toplevel/$sm_path'
+          SUBMODULES=$(git submodule --quiet foreach --recursive 'echo $toplevel/$sm_path')
+          for sm in $SUBMODULES; do
+            rm -rf "$sm"
+          done
           rm -rf .git
           rm -rf .vs
           rm -rf .github/workflows
