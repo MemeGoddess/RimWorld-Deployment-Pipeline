@@ -278,6 +278,7 @@ jobs:
     - name: Cleanup
       working-directory: 'mod'
       run: |
+          ls -la
           git submodule foreach --recursive 'rm -rf $toplevel/$sm_path'
           rm -rf .git
           rm -rf .vs
