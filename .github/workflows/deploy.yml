@@ -6,13 +6,12 @@ on:
     inputs:
       workshopId: 
         required: true
-        default: '3526439840'
         description: 'Steam Workshop ID of the mod to upload to'
         type: string
-      ProjectFiles: 
+      ExcludedProjectFiles: 
         required: false
         default: ''
-        description: 'Comma-separated list of project files to build, e.g. "Source/Mod1.csproj, Source/Mod2.csproj"'
+        description: 'Comma-separated list of project files to exclude from build, e.g. "Source/Mod1.csproj, Source/Mod2.csproj"'
         type: string
     secrets:
       STEAM_USERNAME:
@@ -32,6 +31,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         path: 'mod'
+        submodules: 'recursive'
 
     - name: Check required secrets
       env:
@@ -62,24 +62,44 @@ jobs:
           echo 'EOF'
         } >> $GITHUB_OUTPUT
 
+    - name: Detect project files
+      id: detect_projects
+      working-directory: 'mod'
+      run: |
+        set -euo pipefail
+        # Auto-detect .csproj files
+        DETECTED_PROJECTS=$(find . -type f -name '*.csproj' -printf '%P\n' | grep -v '[{}]' | grep -v '^Workshop/' | paste -sd, - || echo "")
+        # Exclude any specified project files
+        EXCLUDED="${{ inputs.ExcludedProjectFiles }}"
+        IFS=',' read -ra EXCL_ARR <<< "$EXCLUDED"
+        for EXCL in "${EXCL_ARR[@]}"; do
+          EXCL="$(printf '%s' "$EXCL" | xargs)"  # trim whitespace
+          if [ -n "$EXCL" ]; then
+            DETECTED_PROJECTS=$(printf '%s' "$DETECTED_PROJECTS" | tr ',' '\n' | grep -v -F "$EXCL" | paste -sd, - || echo "")
+          fi
+        done
+        echo "PROJECT_FILES=$DETECTED_PROJECTS" >> $GITHUB_ENV
+        echo "PROJECT_FILES=$DETECTED_PROJECTS" >> $GITHUB_OUTPUT
+        echo "Detected project files: $DETECTED_PROJECTS"
+
     - name: Set up .NET SDK
-      if: ${{ inputs.ProjectFiles != '' }}
+      if: ${{ steps.detect_projects.outputs.PROJECT_FILES != '' }}
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
     - name: Download Steam Workshop Dependencies
-      if: ${{ inputs.ProjectFiles != '' }}
+      if: ${{ steps.detect_projects.outputs.PROJECT_FILES != '' }}
       uses: MemeGoddess/RimWorld-Deployment-Pipeline/.github/actions/download-steam-workshop@beta
       with: 
         path: 'mod'
 
     - name: Build Mod
-      if: ${{ inputs.ProjectFiles != '' }}
+      if: ${{ steps.detect_projects.outputs.PROJECT_FILES != '' }}
       working-directory: 'mod'
       run: |
         set -euo pipefail
-        FILES="${{ inputs.ProjectFiles }}"
+        FILES="${{ steps.detect_projects.outputs.PROJECT_FILES }}"
         IFS=',' read -ra FILE_ARR <<< "$FILES"
         for FILE in "${FILE_ARR[@]}"; do
           FILE="$(printf '%s' "$FILE" | xargs)"  # trim whitespace
@@ -92,6 +112,10 @@ jobs:
     - name: Cleanup
       working-directory: 'mod'
       run: |
+          SUBMODULES=$(git submodule --quiet foreach --recursive 'echo $toplevel/$sm_path')
+          for sm in $SUBMODULES; do
+            rm -rf "$sm"
+          done
           rm -rf .git
           rm -rf .vs
           rm -rf .github/workflows
