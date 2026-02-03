@@ -30,7 +30,7 @@ jobs:
           
           # ex: 'Source/RimMod.csproj, ModCompat/X/X.csproj'
           # optional, will skip building if not provided
-          ProjectFiles: 'Source/RimMod.csproj' 
+          # ExcludedProjectFiles: 'Source/RimMod.csproj' 
 ```
 
 ## Build on PR close
