@@ -275,6 +275,23 @@ jobs:
           fi
         done
 
+    - name: Convert SVG files in **/Textures/** to PNG
+      working-directory: 'mod'
+      run: |
+        set -euo pipefail
+        if ! command -v rsvg-convert >/dev/null 2>&1; then
+          sudo apt-get update -y
+          sudo apt-get install -y librsvg2-bin
+        fi
+
+        while IFS= read -r -d '' svg; do
+          dest="${svg%.*}.png"
+          # Convert when SVG newer than PNG
+          if [ ! -f "$dest" ] || [ "$svg" -nt "$dest" ]; then
+              rsvg-convert -a -o "$dest" "$svg"
+          fi
+        done < <(find . -type f -path '*/Textures/*' -iname '*.svg' -print0)
+
     - name: Cleanup
       working-directory: 'mod'
       run: |
