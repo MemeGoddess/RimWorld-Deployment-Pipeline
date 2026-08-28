@@ -45,6 +45,7 @@ function addSecret()
 
 function updateSecrets()
 {
+    local force_update_flag=$1
     steamcmd +login $STEAM_USERNAME +quit
     verifySteam
 
@@ -57,17 +58,34 @@ function updateSecrets()
                 continue
             fi
             updated_date=$(echo "$secret_line" | awk '{print $NF}')
-            if updated_ts=$(date -d "$updated_date" +%s 2>/dev/null); then
-                cutoff_ts=$(date -d "1 month ago" +%s)
-                if [[ "$updated_ts" -lt "$cutoff_ts" ]]; then
-                    echo "STEAM_CONFIG_VDF older than 1 month, updating..."
-                    gh secret set STEAM_CONFIG_VDF -R "$GH_USERNAME/$RepoName" < ~/Steam/config/config.vdf
-                else
-                    echo "STEAM_CONFIG_VDF is up to date (updated $updated_date)"
-                fi
+
+            local should_update=0
+            if [[ "$force_update_flag" == "--force" ]]; then
+                should_update=1
             else
-                echo "$RepoName: Could not parse updated date: $updated_date"
+                if updated_ts=$(date -d "$updated_date" +%s 2>/dev/null); then
+                    cutoff_ts=$(date -d "1 month ago" +%s)
+                    if [[ "$updated_ts" -lt "$cutoff_ts" ]]; then
+                        should_update=1
+                    else
+                        echo "STEAM_CONFIG_VDF is up to date (updated $updated_date)"
+                    fi
+                else
+                    echo "$RepoName: Could not parse updated date: $updated_date"
+                fi
             fi
+
+            if [[ $should_update -eq 1 ]]; then
+                if [[ "$force_update_flag" == "--force" ]]; then
+                    echo "STEAM_CONFIG_VDF forced update for $RepoName (skipping age check)."
+                else
+                    echo "STEAM_CONFIG_VDF older than 1 month, updating..."
+                fi
+                gh secret set STEAM_CONFIG_VDF -R "$GH_USERNAME/$RepoName" < ~/Steam/config/config.vdf
+            fi
+
+        else
+            echo "$RepoName: Could not parse updated date: $updated_date"
         fi
     done
 
@@ -135,7 +153,7 @@ while [ "$1" != "" ]; do
             printf "Options:\n"
             printf "  -h, --help     Show this help message\n"
             printf "  -a, --add      Add STEAM_CONFIG_VDF secret to a specific $GH_USERNAME repo\n"
-            printf "  -u, --update   Scan $GH_USERNAME repos and update STEAM_CONFIG_VDF if older than 1 month\n\n"
+            printf "  -u, --update   Scan $GH_USERNAME repos and update STEAM_CONFIG_VDF if older than 1 month, or --force for all\n\n"
             printf "Example: ./update-secret.sh --add\n"
             exit
             ;;
@@ -144,7 +162,7 @@ while [ "$1" != "" ]; do
             exit
             ;;
         -u | --update ) 
-            updateSecrets
+            updateSecrets "$2" # Pass the second argument (potential --force) to updateSecrets
             exit
             ;;
         * )
@@ -159,6 +177,6 @@ printf "Usage: %s [OPTIONS]\n\n" "update-secret.sh"
 printf "Options:\n"
 printf "  -h, --help     Show this help message\n"
 printf "  -a, --add      Add STEAM_CONFIG_VDF secret to a specific $GH_USERNAME repo\n"
-printf "  -u, --update   Scan $GH_USERNAME repos and update STEAM_CONFIG_VDF if older than 1 month\n\n"
+printf "  -u, --update   Scan $GH_USERNAME repos and update STEAM_CONFIG_VDF if older than 1 month, or --force for all\n\n"
 printf "Example: ./update-secret.sh --add\n"
 exit

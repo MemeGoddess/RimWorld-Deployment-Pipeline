@@ -125,6 +125,8 @@ jobs:
           rm -rf README.md
           sudo rm -rf Workshop
           find . -type d -name "obj" -exec rm -rf {} +
+          find . -type f -path '*/Assemblies/*' -iname 'DevTools.dll' -print -delete
+          find . -type f -path '*/Assemblies/*' -iname '*.Tests.dll' -print -delete
 
     - name: Upload to Steam Workshop
       uses: m00nl1ght-dev/steam-workshop-deploy@v4
